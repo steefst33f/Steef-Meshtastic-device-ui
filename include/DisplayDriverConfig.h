@@ -14,7 +14,7 @@ class DisplayDriver;
  */
 class DisplayDriverConfig
 {
-  public:
+    public:
     enum struct device_t {
         NONE,
         CUSTOM_TFT,
@@ -30,7 +30,8 @@ class DisplayDriverConfig
         HELTEC_TRACKER,
         WT32_SC01_PLUS,
         ESP2432S028RV1,
-        ESP2432S028RV2
+        ESP2432S028RV2,
+        ESP32_3248S035R,
     };
 
     struct panel_config_t {

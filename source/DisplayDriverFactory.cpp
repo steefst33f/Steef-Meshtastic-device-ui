@@ -54,6 +54,9 @@
 #ifdef NODEMCU_32S
 #include "LGFX_ESPILI9341XPT2046.h"
 #endif
+#ifdef STEEF
+#include "LGFX_ESP32_3248S035R.h"
+#endif
 #endif
 
 DisplayDriverFactory::DisplayDriverFactory() {}
@@ -93,6 +96,7 @@ DisplayDriver *DisplayDriverFactory::create(const DisplayDriverConfig &cfg)
         return &X11Driver::create(cfg.width(), cfg.height());
     }
 #endif
+
     switch (cfg._device) {
 #ifndef ARCH_PORTDUINO
 #if !defined(LGFX_DRIVER)
@@ -138,11 +142,15 @@ DisplayDriver *DisplayDriverFactory::create(const DisplayDriverConfig &cfg)
     case DisplayDriverConfig::device_t::ESP2432S028RV2:
         return new LGFXDriver<LGFX_ESP2432S028RV2>(cfg.width(), cfg.height());
         break;
-#endif
+#elif defined(STEEF)
+    case DisplayDriverConfig::device_t::ESP32_3248S035R:
+        return new LGFXDriver<LGFX_ESP32_3248S035R>(cfg.width(), cfg.height());
+        break;
 #elif defined(USE_X11)
     case DisplayDriverConfig::device_t::X11:
         return &X11Driver::create(cfg.width(), cfg.height());
         break;
+#endif
 #endif
     default:
         ILOG_CRIT("LGFX device_t config not implemented: %d\n", cfg._device);
