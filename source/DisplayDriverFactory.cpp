@@ -54,8 +54,8 @@
 #ifdef NODEMCU_32S
 #include "LGFX_ESPILI9341XPT2046.h"
 #endif
-#ifdef STEEF
-#include "LGFX_ESP32_3248S035R.h"
+#ifdef STEEF_ST7789_XPT2046
+#include "LGFX_ST7789_XPT2046.h"
 #endif
 #endif
 
@@ -142,9 +142,9 @@ DisplayDriver *DisplayDriverFactory::create(const DisplayDriverConfig &cfg)
     case DisplayDriverConfig::device_t::ESP2432S028RV2:
         return new LGFXDriver<LGFX_ESP2432S028RV2>(cfg.width(), cfg.height());
         break;
-#elif defined(STEEF)
-    case DisplayDriverConfig::device_t::ESP32_3248S035R:
-        return new LGFXDriver<LGFX_ESP32_3248S035R>(cfg.width(), cfg.height());
+#elif defined(STEEF_ST7789_XPT2046)
+    case DisplayDriverConfig::device_t::ESP32S3_ST7789_XPT2046:
+        return new LGFXDriver<LGFX_ST7789_XPT2046>(cfg.width(), cfg.height());
         break;
 #elif defined(USE_X11)
     case DisplayDriverConfig::device_t::X11:
