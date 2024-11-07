@@ -64,8 +64,8 @@ class LGFX_ST7789_XPT2046 : public lgfx::LGFX_Device
             cfg.dummy_read_pixel = 8;       // Number of bits for dummy read before pixel readout
             cfg.dummy_read_bits = 1;        // Number of bits for dummy read before non-pixel data read
             cfg.readable = true;            // Set to true if data can be read
-            cfg.invert = true;              // Set to true if the light/darkness of the panel is reversed
-            cfg.rgb_order = false;          // Set to true if the panel's red and blue are swapped
+            cfg.invert = false;              // Set to true if the light/darkness of the panel is reversed
+            cfg.rgb_order = true;          // Set to true if the panel's red and blue are swapped
             cfg.dlen_16bit = false;         // Set to true for panels that transmit data length in 16-bit
                                             // units with 16-bit parallel or SPI
             cfg.bus_shared = true;          // If the bus is shared with the SD card, set to
