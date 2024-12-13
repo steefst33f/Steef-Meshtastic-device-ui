@@ -54,6 +54,9 @@
 #ifdef NODEMCU_32S
 #include "LGFX_ESPILI9341XPT2046.h"
 #endif
+#ifdef DIY_ESP32S3_ST7789_XPT2046
+#include "LGFX_ST7789_XPT2046.h"
+#endif
 #endif
 
 DisplayDriverFactory::DisplayDriverFactory() {}
