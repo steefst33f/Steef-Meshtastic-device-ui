@@ -13,6 +13,7 @@ class TFTView_320x240 : public MeshtasticView
 {
   public:
     void init(IClientBase *client) override;
+    void setupUIConfig(const meshtastic_DeviceUIConfig& uiconfig) override;
     void task_handler(void) override;
 
     // methods to update view
@@ -86,6 +87,7 @@ class TFTView_320x240 : public MeshtasticView
         eRegion,
         eModemPreset,
         eChannel,
+        eWifi,
         eLanguage,
         eScreenTimeout,
         eScreenLock,
@@ -119,6 +121,10 @@ class TFTView_320x240 : public MeshtasticView
 
     typedef void (*UserWidgetFunc)(lv_obj_t *, void *, int);
 
+    // initialize all ui screens
+    virtual void init_screens(void);
+    // update custom display string on boot screen 
+    virtual void updateBootMessage(void);
     // update node counter display (online and filtered)
     virtual void updateNodesStatus(void);
     // display message popup
@@ -193,11 +199,22 @@ class TFTView_320x240 : public MeshtasticView
 
     void scanSignal(uint32_t scanNo);
     void handleTraceRouteResponse(const meshtastic_Routing &routing);
-    void addNodeToTraceRoute(uint32_t nodeNum);
+    void addNodeToTraceRoute(uint32_t nodeNum, lv_obj_t *panel);
     void removeSpinner(void);
     void packetDetected(const meshtastic_MeshPacket &p);
     void writePacketLog(const meshtastic_MeshPacket &p);
     void updateStatistics(const meshtastic_MeshPacket &p);
+
+    uint32_t language2val(meshtastic_Language lang);
+    meshtastic_Language val2language(uint32_t val);
+    void setLocale(meshtastic_Language lang);
+    void setLanguage(meshtastic_Language lang);
+    void setTimeout(uint32_t timeout);
+    void setBrightness(uint32_t brightness);
+    void setTheme(uint32_t theme);
+    void storeNodeOptions(void);
+    void showLoRaFrequency(const meshtastic_Config_LoRaConfig &cfg);
+    void setBellText(bool banner, bool sound);
 
     // lvgl event callbacks
     // static void ui_event_HomeButton(lv_event_t * e);
@@ -217,6 +234,8 @@ class TFTView_320x240 : public MeshtasticView
     static void ui_event_EnvelopeButton(lv_event_t *e);
     static void ui_event_OnlineNodesButton(lv_event_t *e);
     static void ui_event_TimeButton(lv_event_t *e);
+    static void ui_event_LoRaButton(lv_event_t *e);
+    static void ui_event_BellButton(lv_event_t *e);
     static void ui_event_LocationButton(lv_event_t *e);
     static void ui_event_WLANButton(lv_event_t *e);
     static void ui_event_MQTTButton(lv_event_t *e);
@@ -231,6 +250,7 @@ class TFTView_320x240 : public MeshtasticView
     static void ui_event_role_button(lv_event_t *e);
     static void ui_event_region_button(lv_event_t *e);
     static void ui_event_preset_button(lv_event_t *e);
+    static void ui_event_wifi_button(lv_event_t *e);
     static void ui_event_language_button(lv_event_t *e);
     static void ui_event_channel_button(lv_event_t *e);
     static void ui_event_brightness_button(lv_event_t *e);
@@ -265,6 +285,7 @@ class TFTView_320x240 : public MeshtasticView
     static void ui_event_trace_route(lv_event_t *e);
     static void ui_event_trace_route_to(lv_event_t *e);
     static void ui_event_trace_route_start(lv_event_t *e);
+    static void ui_event_trace_route_node(lv_event_t *e);
     static void ui_event_neighbors(lv_event_t *e);
     static void ui_event_statistics(lv_event_t *e);
     static void ui_event_packet_log(lv_event_t *e);
@@ -290,6 +311,7 @@ class TFTView_320x240 : public MeshtasticView
     enum BasicSettings activeSettings = eNone; // active settings menu (used to disable other button presses)
 
     static TFTView_320x240 *gui;                     // singleton pattern
+    bool screensInitialised;                         // true if init_screens is completed
     uint32_t nodesFiltered;                          // no. hidden nodes in node list
     bool processingFilter;                           // indicates that filtering is ongoing
     bool packetLogEnabled;                           // display received packets
@@ -319,11 +341,13 @@ class TFTView_320x240 : public MeshtasticView
     // extended default device profile struct with additional required data
     struct meshtastic_DeviceProfile_ext : meshtastic_DeviceProfile {
         meshtastic_Channel channel[c_max_channels]; // storage of channel info
+        meshtastic_DeviceUIConfig uiConfig;         // storage of persistent UI data
     };
 
     // additional local ui data
     struct meshtastic_DeviceProfile_full : meshtastic_DeviceProfile_ext {
-        uint16_t ringtoneId; // index into ringtone preset
+        uint16_t ringtoneId;         // index into ringtone preset
+        bool silent;                 // sound silenced
     };
 
     meshtastic_DeviceProfile_full db; // full copy of the node's configuration db (except nodeinfos) plus ui data

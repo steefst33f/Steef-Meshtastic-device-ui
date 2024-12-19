@@ -3,9 +3,8 @@
 #include "ILog.h"
 #include "ViewController.h"
 #include "ui.h"
+#include "lv_i18n.h"
 #include <cstdio>
-
-extern const char *firmware_version;
 
 MeshtasticView::MeshtasticView(const DisplayDriverConfig *cfg, DisplayDriver *driver, ViewController *_controller)
     : DeviceGUI(cfg, driver), controller(_controller), requests(c_request_timeout)
@@ -15,7 +14,7 @@ MeshtasticView::MeshtasticView(const DisplayDriverConfig *cfg, DisplayDriver *dr
 void MeshtasticView::init(IClientBase *client)
 {
     DeviceGUI::init(client);
-    lv_label_set_text(objects.firmware_label, firmware_version);
+    //lv_label_set_text(objects.firmware_label, firmware_version);
     controller->init(this, client);
 }
 
@@ -155,7 +154,7 @@ bool MeshtasticView::lastHeardToString(uint32_t lastHeard, char *buf)
     time(&curtime);
     time_t timediff = curtime - lastHeard;
     if (timediff < 60)
-        strcpy(buf, "now");
+        strcpy(buf, _("now"));
     else if (timediff < 3600)
         sprintf(buf, "%d min", timediff / 60);
     else if (timediff < 3600 * 24)
@@ -194,7 +193,7 @@ const char *MeshtasticView::deviceRoleToString(enum eRole role)
     case tak_tracker:
         return "TAK Tracker";
     default:
-        ILOG_ERROR("Invalid device role\n");
+        ILOG_ERROR("Invalid device role");
         return "<unknown>";
     };
 }
@@ -215,7 +214,7 @@ bool MeshtasticView::base64ToPsk(const std::string &base64, meshtastic_ChannelSe
     std::string out;
     auto error = macaron::Base64::Decode(base64, out);
     if (!error.empty()) {
-        ILOG_ERROR("Cannot decode '%s'\n", base64);
+        ILOG_ERROR("Cannot decode '%s'", base64);
         return false;
     } else {
         memcpy((char *)&psk.bytes[0], out.data(), out.size());

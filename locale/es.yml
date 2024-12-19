@@ -1,79 +1,133 @@
 es:
-  no new messages: ~
-  1 of 1 nodes online: ~
-  DEL: ~
-  'User name: ': ~
+  no new messages: sin mensajes nuevos
+  1 of 1 nodes online: 1 de 1 nodos activos
+  DEL: BOR
+  'User name: ': 'Nomb. Usua:'
   'Modem Preset: LONG FAST': ~
-  'Channel: LongFast': ~
-  'Role: Client': ~
-  'Screen Timeout: 60s': ~
-  'Screen Brightness: 60%': ~
-  'Screen Calibration: default': ~
+  'Channel: LongFast': 'Canal: LongFast'
+  'Role: Client': 'Rol: Cliente'
+  'Screen Timeout: 60s': 'Apag. Panta: 60s'
+  'Screen Brightness: 60%': 'Brillo Pantalla: 60%'
+  'Screen Calibration: default': 'Calibración Pantalla: predet.'
   'Input Control: none/none': ~
-  'Message Alert Buzzer: on': ~
-  'Language: English': ~
-  Configuration  Reset: ~
-  Reboot / Shutdown: ~
-  Group Channels: ~
-  no messages: ~
-  Settings: ~
-  Settings (advanced): ~
-  Locations Map: ~
-  no chats: ~
-  Node Options: ~
-  Short Name: ~
-  Long Name: ~
-  <unset>: ~
-  LONG FAST\nLONG SLOW\nVERY LONG SLOW\nMEDIUM SLOW\nMEDIUM FAST\nSHORT SLOW\nSHORT FAST\nLONG MODERATE: ~
+  'Message Alert Buzzer: on': 'Zumbador en mensaje: on'
+  'Language: English': 'Idioma: Español'
+  Configuration Reset: Reiniciar Configuración
+  Reboot / Shutdown: Reiniciar / Apagar
+  Group Channels: Canales Grupales
+  no messages: sin mensajes
+  Settings: Configuración
+  Settings (advanced): Configur. avanzada
+  Locations Map: Mapa de localizaciones
+  no chats: sin chats
+  Node Options: Opciones de Nodos
+  Short Name: Nombre Corto
+  Long Name: Nombre Largo
+  <unset>: <vacío>
   'FrequencySlot: 1 (902.0MHz)': ~
-  Client\nClient Mute\nRouter\nRouter Client\nRepeater\nTracker\nSensor\nTAK\nClient Hidden\nLost & Found\nTAK Tracker: ~
-  'Brightness: 60%': ~
+  'Brightness: 60%': 'Brillo: 60%'
   'Timeout: 60s': ~
-  Mouse: ~
-  Keyboard: ~
-  Message Alert: ~
-  NodeDB Reset\nFactory Reset: ~
-  Channel Name: ~
-  Pre-shared Key: ~
-  New Message from\n: ~
-  Resynch...: ~
-  'User name: %s': ~
-  'Device Role: %s': ~
-  'Screen Calibration: %s': ~
-  done: ~
-  default: ~
-  'Region: %s': ~
+  Mouse: Ratón
+  Keyboard: Teclado
+  Message Alert: Alertar mensaje
+  "NodeDB Reset\nFactory Reset": "Borrar NodeDB\nReini. Fábrica"
+  Channel Name: Nombre Canal
+  Pre-shared Key: Clave Precomp.
+  New Message from\n: Nuevo msg de\n
+  'User name: %s': 'Nombre: %s'
+  'Device Role: %s': 'Rol Dispo.: %s'
+  'Screen Calibration: %s': 'Calibración pant.: %s'
+  done: hecho
+  default: defecto
+  'Region: %s': 'Región: %s'
   'Modem Preset: %s': ~
-  'Channel: %s': ~
-  'Language: %s': ~
-  'Screen Lock: off': ~
-  'Theme: Dark': ~
-  Mesh Detector: ~
-  Signal Scanner: ~
-  Trace Route: ~
-  Neighbors: ~
-  Statistics: ~
-  Packet Log: ~
-  Settings & Tools: ~
-  Node Search: ~
-  Neigbors: ~
-  Client\nClient Mute\n-- deprecated --\nRouter\nRepeater\nTracker\nSensor\nTAK\nClient Hidden\nLost & Found\nTAK Tracker: ~
-  Light\nDark: ~
-  Screen Lock: ~
-  Lock PIN: ~
-  Ringtone: ~
-  Zone: ~
-  City: ~
-  Unknown: ~
-  Offline: ~
-  Public Key: ~
-  Hops away: ~
-  <= 7\n<= 6\n<= 5\n<= 4\n<= 3\n<= 2\n<= 1\n0\n>= 1\n>= 2\n>= 3\n>= 4\n>= 5\n>= 6\n>= 7: ~
+  'Channel: %s': 'Canal: %s'
+  'Language: %s': 'Idioma: %s'
+  'Screen Lock: off': 'Bloq. Panta.: off'
+  'Theme: Dark': 'Tema: Oscuro'
+  Mesh Detector: Detector Mesh
+  Signal Scanner: Escáner de señal
+  Trace Route: Trazar ruta
+  Neighbors: Vecinos
+  Statistics: Estadísticas
+  Packet Log: Registro de paquetes
+  Settings & Tools: Config y herramientas
+  Node Search: Buscar nodo
+  Screen Lock: Bloqueo Pantalla
+  Lock PIN: PIN bloq.
+  Ringtone: Timbre
+  Zone: Zona
+  City: Ciudad
+  Unknown: Desconocido
+  Offline: Inactivo(s)
+  Public Key: Clave Pública
+  Hops away: Saltos
   MQTT: ~
-  Position: ~
-  Name: ~
-  Active Chat: ~
-  Telemetry: ~
+  Position: Posición
+  Name: Nombre
+  Active Chat: Chat Activo
+  Telemetry: Telemetría
   IAQ: ~
-  Start: ~
-  'Theme: %s': ~
+  Start: Iniciar
+  'Theme: %s': 'Tema: %s'
+  'uptime 00:00:00': ~
+  'Heap: 0\nLVGL: 0': ~
+  Meshtastic: ~
+  Packet Statistics: Estadísticas
+  "LONG FAST\nLONG SLOW\n-- deprecated --\nMEDIUM SLOW\nMEDIUM FAST\nSHORT SLOW\nSHORT FAST\nLONG MODERATE\nSHORT TURBO": "LONG FAST\nLONG SLOW\n-- obsoleto --\nMEDIUM SLOW\nMEDIUM FAST\nSHORT SLOW\nSHORT FAST\nLONG MODERATE\nSHORT TURBO"
+  "Client\nClient Mute\nRouter\n-- deprecated --\nRepeater\nTracker\nSensor\nTAK\nClient Hidden\nLost & Found\nTAK Tracker": "Client\nClient Mute\nRouter\n-- obsoleto --\nRepeater\nTracker\nSensor\nTAK\nClient Hidden\nLost & Found\nTAK Tracker"
+  "Dark\nLight": "Oscuro\nClaro"
+  none: ~
+  Default: ~
+  OK: ~
+  Cancel: Cancelar
+  'FrequencySlot: %d (%g MHz)': ~
+  'Brightness: %d%%': 'Brillo : %d%%'
+  'Timeout: off': ~
+  'Timeout: %ds': ~
+  Stop: Parar
+  "choose\nnode": "escoge\nnodo"
+  choose target node: escoge nodo de destino
+  'heard: !%08x': 'oído: !%08x'
+  'Packet Log: %d': 'Reg. Paquetes: %d'
+  'Screen Timeout: off': 'Apag. Pantalla: off'
+  'Screen Timeout: %ds': 'Apag. Pantalla: %ds'
+  'Screen Brightness: %d%%': 'Brillo pantalla: %d%%'
+  'Screen Lock: %s': 'Bloq. Pantalla: %s'
+  'on': ~
+  'off': ~
+  'Message Alert: %s': 'Alertar mensaje: %s'
+  Util %0.1f%%  Air %0.1f%%: Util %0.1f%%  Aire %0.1f%%
+  'hops: %d': 'saltos: %d'
+  unknown: desconocido
+  <no name>: <sin nombre>
+  '%d active chat(s)': '%d chat(s) activos'
+  "New message from \n%s": "Nuevo mensaje de:\n%s"
+  'Input Control: %s/%s': ~
+  '%d of %d nodes online': '%d de %d nodos activos'
+  Filtering ...: Filtrando ...
+  'Filter: %d of %d nodes': 'Filtro: %d de %d nodos'
+  now: ahora
+  '%d new message': '%d mensaje nuevo'
+  '%d new messages': '%d mensajes nuevos'
+  'uptime: %02d:%02d:%02d': 'encendido: %02d:%02d:%02d'
+  'Heap: %d (%d%%)\nLVGL: %d (%d%%)': ~
+  Tools: Herramientas
+  Filter: Filtro
+  Highlight: Resalte
+  Primary Channel: Canal Primario
+  Secondary Channels: Canal Secundario
+  Resynch ...: Resincronizando ...
+  Rebooting ...: Reiniciando ...
+  Shutting down ...: Apagando ...
+  LoRa 0.0 MHz: ~
+  silent: silenciado
+  'WiFi: <not setup>': 'WiFi: <no configurada>'
+  LoRa TX off!: LoRa TX apagado!
+  WiFi SSID: Nombre de la WiFi
+  WiFi pre-shared Key: Clave de la WiFi
+  'WiFi: %s': ~
+  <not set>: <vacío>
+  Banner & Sound: Visual y sonora
+  Banner only: Solo visual
+  Sound only: Solo Sonora

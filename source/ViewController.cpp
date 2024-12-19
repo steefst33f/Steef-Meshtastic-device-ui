@@ -10,12 +10,12 @@ const size_t DATA_PAYLOAD_LEN = meshtastic_Constants_DATA_PAYLOAD_LEN;
  * @brief mediate between GUI view and client interface
  *
  */
-ViewController::ViewController() : view(nullptr), client(nullptr), sendId(1), myNodeNum(0), requestConfigRequired(true) {}
+ViewController::ViewController() : view(nullptr), client(nullptr), sendId(1), myNodeNum(0), 
+                                   lastSetup(0), setupDone(false), requestConfigRequired(true) {}
 
 void ViewController::init(MeshtasticView *gui, IClientBase *_client)
 {
     time(&lastrun10);
-    lastrun10 += 10;
     view = gui;
     client = _client;
     if (client) {
@@ -31,7 +31,8 @@ void ViewController::init(MeshtasticView *gui, IClientBase *_client)
 void ViewController::runOnce(void)
 {
     if (client) {
-        requestConfig();
+        if (!setupDone || requestConfigRequired)
+            requestConfig();
         receive();
 
         // executed every 10s:
@@ -42,6 +43,10 @@ void ViewController::runOnce(void)
             lastrun10 = curtime;
             if (!client->isConnected())
                 client->connect();
+            if (!setupDone && curtime - lastSetup >= 10) {
+                requestConfigRequired = true;
+                requestConfig();
+            }
         }
     }
 }
@@ -55,6 +60,12 @@ bool ViewController::sleep(int16_t pin)
 }
 
 void ViewController::processEvent(void) {}
+
+uint32_t ViewController::requestDeviceUIConfig(void)
+{
+    return sendAdminMessage(meshtastic_AdminMessage{.which_payload_variant = meshtastic_AdminMessage_get_ui_config_request_tag,
+                                                    .get_ui_config_request = true}, myNodeNum);
+}
 
 uint32_t ViewController::requestDeviceConfig(uint32_t nodeId)
 {
@@ -144,6 +155,12 @@ bool ViewController::requestReset(bool factoryReset, uint32_t nodeId)
                                     (pb_size_t)(factoryReset ? meshtastic_AdminMessage_factory_reset_config_tag
                                                              : meshtastic_AdminMessage_nodedb_reset_tag)},
         nodeId ? nodeId : myNodeNum);
+}
+
+bool ViewController::storeUIConfig(const meshtastic_DeviceUIConfig &config)
+{
+    return sendAdminMessage(meshtastic_AdminMessage{.which_payload_variant = meshtastic_AdminMessage_store_ui_config_tag,
+                                                    .store_ui_config = config}, myNodeNum);
 }
 
 bool ViewController::sendConfig(const meshtastic_User &user, uint32_t nodeId)
@@ -357,7 +374,7 @@ bool ViewController::sendAdminMessage(meshtastic_AdminMessage &config, uint32_t 
 {
     meshtastic_Data_payload_t payload;
     payload.size = pb_encode_to_bytes(payload.bytes, DATA_PAYLOAD_LEN, &meshtastic_AdminMessage_msg, &config);
-    return send(nodeId, meshtastic_PortNum_ADMIN_APP, payload);
+    return send(nodeId, meshtastic_PortNum_ADMIN_APP, payload, true);
 }
 
 /**
@@ -368,7 +385,7 @@ bool ViewController::sendAdminMessage(meshtastic_AdminMessage &&config, uint32_t
 {
     meshtastic_Data_payload_t payload;
     payload.size = pb_encode_to_bytes(payload.bytes, DATA_PAYLOAD_LEN, &meshtastic_AdminMessage_msg, &config);
-    return send(nodeId, meshtastic_PortNum_ADMIN_APP, payload);
+    return send(nodeId, meshtastic_PortNum_ADMIN_APP, payload, true);
 }
 
 void ViewController::sendHeartbeat(void)
@@ -399,7 +416,7 @@ void ViewController::sendTextMessage(uint32_t to, uint8_t ch, uint8_t hopLimit, 
 
 bool ViewController::requestPosition(uint32_t to, uint8_t ch, uint32_t requestId)
 {
-    ILOG_DEBUG("sending position request\n");
+    ILOG_DEBUG("sending position request");
     meshtastic_Position position{};
     meshtastic_Data_payload_t payload;
     payload.size = pb_encode_to_bytes(payload.bytes, DATA_PAYLOAD_LEN, &meshtastic_Position_msg, &position);
@@ -417,10 +434,9 @@ bool ViewController::requestPosition(uint32_t to, uint8_t ch, uint32_t requestId
 
 void ViewController::traceRoute(uint32_t to, uint8_t ch, uint8_t hopLimit, uint32_t requestId)
 {
-    meshtastic_Routing request{.route_request{.route_count = 1, .route{myNodeNum}}};
-
+    meshtastic_RouteDiscovery request{};
     meshtastic_Data_payload_t payload;
-    payload.size = pb_encode_to_bytes(payload.bytes, DATA_PAYLOAD_LEN, &meshtastic_Routing_msg, &request);
+    payload.size = pb_encode_to_bytes(payload.bytes, DATA_PAYLOAD_LEN, &meshtastic_RouteDiscovery_msg, &request);
     send(to, ch, hopLimit, requestId, meshtastic_PortNum_TRACEROUTE_APP, true, payload.bytes, payload.size);
 }
 
@@ -433,13 +449,13 @@ void ViewController::traceRoute(uint32_t to, uint8_t ch, uint8_t hopLimit, uint3
  * @return true
  * @return false
  */
-bool ViewController::send(uint32_t to, meshtastic_PortNum portnum, const meshtastic_Data_payload_t &payload)
+bool ViewController::send(uint32_t to, meshtastic_PortNum portnum, const meshtastic_Data_payload_t &payload, bool wantRsp)
 {
-    ILOG_DEBUG("sending meshpacket to radio portnum=%u\n", portnum);
+    ILOG_DEBUG("sending meshpacket to radio id=0x%08x, to=0x%08x(%u), portnum=%u, len=%u, wantRsp=%d", 0, to, to, portnum, payload.size, wantRsp);
     return client->send(meshtastic_ToRadio{.which_payload_variant = meshtastic_ToRadio_packet_tag,
                                            .packet{.to = to,
                                                    .which_payload_variant = meshtastic_MeshPacket_decoded_tag,
-                                                   .decoded{.portnum = portnum, .payload{payload}, .want_response = true},
+                                                   .decoded{.portnum = portnum, .payload{payload}, .want_response = wantRsp},
                                                    .want_ack = (to != 0)}});
 }
 
@@ -449,8 +465,8 @@ bool ViewController::send(uint32_t to, meshtastic_PortNum portnum, const meshtas
 bool ViewController::send(uint32_t to, uint8_t ch, uint8_t hopLimit, uint32_t requestId, meshtastic_PortNum portnum, bool wantRsp,
                           const unsigned char bytes[233], size_t len)
 {
-    ILOG_DEBUG("sending meshpacket to radio to=0x%08x(%u), ch=%u, id=0x%08x, portnum=%u, len=%u\n", to, to, (unsigned int)ch,
-               requestId, portnum, len);
+    ILOG_DEBUG("sending meshpacket to radio id=0x%x, to=0x%08x(%u), ch=%u, portnum=%u, len=%u, wantRsp=%d", requestId, to, to, (unsigned int)ch,
+               portnum, len, wantRsp);
     // send requires movable lvalue, i.e. a temporary object
     return client->send(meshtastic_ToRadio{
         .which_payload_variant = meshtastic_ToRadio_packet_tag,
@@ -521,6 +537,7 @@ void ViewController::requestConfig(void)
     if (client->isConnected() && requestConfigRequired) {
         client->send(meshtastic_ToRadio{.which_payload_variant = meshtastic_ToRadio_want_config_id_tag, .want_config_id = 1});
         requestConfigRequired = false;
+        time(&lastSetup);
     }
 }
 
@@ -546,217 +563,232 @@ bool ViewController::requestDeviceConnectionStatus(void)
 
 bool ViewController::handleFromRadio(const meshtastic_FromRadio &from)
 {
-    ILOG_DEBUG("handleFromRadio variant %u\n", from.which_payload_variant);
-    switch (from.which_payload_variant) {
-    case meshtastic_FromRadio_my_info_tag: {
+    ILOG_DEBUG("handleFromRadio variant %u", from.which_payload_variant);
+    if (from.which_payload_variant == meshtastic_FromRadio_deviceuiConfig_tag) {
+        view->setupUIConfig(from.deviceuiConfig);
+        setupDone = true;
+    }
+    else if (from.which_payload_variant == meshtastic_FromRadio_my_info_tag) {
         const meshtastic_MyNodeInfo &info = from.my_info;
         view->setMyInfo(info.my_node_num);
         myNodeNum = info.my_node_num;
-        break;
     }
-    case meshtastic_FromRadio_packet_tag: {
-        const meshtastic_MeshPacket &p = from.packet;
-        if (p.which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
-            packetReceived(p);
-        } else {
-            // FIXME: needs implementation when not using PacketClient interface
-            ILOG_ERROR("dropping encoded meshpacket id=%u from radio!\n", from.id);
+    else {
+        if (setupDone) {
+            switch (from.which_payload_variant) {
+                case meshtastic_FromRadio_packet_tag: {
+                    const meshtastic_MeshPacket &p = from.packet;
+                    if (p.which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
+                        packetReceived(p);
+                    } else {
+                        // FIXME: needs implementation when not using PacketClient interface
+                        ILOG_WARN("dropping encoded meshpacket id=%u from radio!", from.id);
+                    }
+                    break;
+                }
+                case meshtastic_FromRadio_node_info_tag: {
+                    const meshtastic_NodeInfo &node = from.node_info;
+                    if (node.has_user) {
+                        view->addOrUpdateNode(node.num, node.channel, node.user.short_name, node.user.long_name, node.last_heard,
+                                              (MeshtasticView::eRole)node.user.role, node.user.public_key.size != 0, node.via_mqtt);
+                    } else {
+                        view->addOrUpdateNode(node.num, node.channel, node.last_heard, (MeshtasticView::eRole)node.user.role, false, node.via_mqtt);
+                    }
+                    if (node.has_position) {
+                        view->updatePosition(node.num, node.position.latitude_i, node.position.longitude_i, node.position.altitude, 0,
+                                             node.position.precision_bits);
+                    }
+                    if (node.has_device_metrics) {
+                        view->updateMetrics(node.num, node.device_metrics.battery_level, node.device_metrics.voltage,
+                                            node.device_metrics.channel_utilization, node.device_metrics.air_util_tx);
+                    }
+                    break;
+                }
+                case meshtastic_FromRadio_config_tag: {
+                    const meshtastic_Config &config = from.config;
+                    switch (config.which_payload_variant) {
+                    case meshtastic_Config_device_tag: {
+                        const meshtastic_Config_DeviceConfig &cfg = config.payload_variant.device;
+                        view->updateDeviceConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_position_tag: {
+                        const meshtastic_Config_PositionConfig &cfg = config.payload_variant.position;
+                        view->updatePositionConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_power_tag: {
+                        const meshtastic_Config_PowerConfig &cfg = config.payload_variant.power;
+                        view->updatePowerConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_network_tag: {
+                        const meshtastic_Config_NetworkConfig &cfg = config.payload_variant.network;
+                        view->updateNetworkConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_display_tag: {
+                        const meshtastic_Config_DisplayConfig &cfg = config.payload_variant.display;
+                        view->updateDisplayConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_lora_tag: {
+                        const meshtastic_Config_LoRaConfig &cfg = config.payload_variant.lora;
+                        view->updateLoRaConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_bluetooth_tag: {
+                        const meshtastic_Config_BluetoothConfig &cfg = config.payload_variant.bluetooth;
+                        view->updateBluetoothConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_security_tag: {
+                        const meshtastic_Config_SecurityConfig &cfg = config.payload_variant.security;
+                        view->updateSecurityConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_sessionkey_tag: {
+                        const meshtastic_Config_SessionkeyConfig &cfg = config.payload_variant.sessionkey;
+                        view->updateSessionKeyConfig(cfg);
+                        break;
+                    }
+                    case meshtastic_Config_device_ui_tag: {
+                        ILOG_DEBUG("skipping meshtastic_Config_device_ui_tag");
+                        break;
+                    }
+                    default:
+                        ILOG_ERROR("unsupported device config variant: %u", config.which_payload_variant);
+                        return false;
+                    }
+                    break;
+                }
+                case meshtastic_FromRadio_moduleConfig_tag: {
+                    const meshtastic_ModuleConfig &module = from.moduleConfig;
+                    switch (module.which_payload_variant) {
+                    case meshtastic_ModuleConfig_mqtt_tag: {
+                        const meshtastic_ModuleConfig_MQTTConfig &cfg = module.payload_variant.mqtt;
+                        view->updateMQTTModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_serial_tag: {
+                        const meshtastic_ModuleConfig_SerialConfig &cfg = module.payload_variant.serial;
+                        view->updateSerialModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_external_notification_tag: {
+                        const meshtastic_ModuleConfig_ExternalNotificationConfig &cfg = module.payload_variant.external_notification;
+                        view->updateExtNotificationModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_store_forward_tag: {
+                        const meshtastic_ModuleConfig_StoreForwardConfig &cfg = module.payload_variant.store_forward;
+                        view->updateStoreForwardModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_range_test_tag: {
+                        const meshtastic_ModuleConfig_RangeTestConfig &cfg = module.payload_variant.range_test;
+                        view->updateRangeTestModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_telemetry_tag: {
+                        const meshtastic_ModuleConfig_TelemetryConfig &cfg = module.payload_variant.telemetry;
+                        view->updateTelemetryModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_canned_message_tag: {
+                        const meshtastic_ModuleConfig_CannedMessageConfig &cfg = module.payload_variant.canned_message;
+                        view->updateCannedMessageModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_audio_tag: {
+                        const meshtastic_ModuleConfig_AudioConfig &cfg = module.payload_variant.audio;
+                        view->updateAudioModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_remote_hardware_tag: {
+                        const meshtastic_ModuleConfig_RemoteHardwareConfig &cfg = module.payload_variant.remote_hardware;
+                        view->updateRemoteHardwareModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_neighbor_info_tag: {
+                        const meshtastic_ModuleConfig_NeighborInfoConfig &cfg = module.payload_variant.neighbor_info;
+                        view->updateNeighborInfoModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_ambient_lighting_tag: {
+                        const meshtastic_ModuleConfig_AmbientLightingConfig &cfg = module.payload_variant.ambient_lighting;
+                        view->updateAmbientLightingModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_detection_sensor_tag: {
+                        const meshtastic_ModuleConfig_DetectionSensorConfig &cfg = module.payload_variant.detection_sensor;
+                        view->updateDetectionSensorModule(cfg);
+                        break;
+                    }
+                    case meshtastic_ModuleConfig_paxcounter_tag: {
+                        const meshtastic_ModuleConfig_PaxcounterConfig &cfg = module.payload_variant.paxcounter;
+                        view->updatePaxCounterModule(cfg);
+                        break;
+                    }
+                    default:
+                        ILOG_ERROR("unsupported module config variant: %u", module.which_payload_variant);
+                        return false;
+                    }
+                    break;
+                }
+                case meshtastic_FromRadio_fileInfo_tag: {
+                    const meshtastic_FileInfo &fileinfo = from.fileInfo;
+                    view->updateFileinfo(fileinfo);
+                    break;
+                }
+                case meshtastic_FromRadio_channel_tag: {
+                    const meshtastic_Channel &ch = from.channel;
+                    if (ch.has_settings) {
+                        view->updateChannelConfig(ch);
+                    }
+                    break;
+                }
+                case meshtastic_FromRadio_metadata_tag: {
+                    const meshtastic_DeviceMetadata &meta = from.metadata;
+                    view->setDeviceMetaData(meta.hw_model, meta.firmware_version, meta.hasBluetooth, meta.hasWifi, meta.hasEthernet,
+                                            meta.canShutdown);
+                    break;
+                }
+                case meshtastic_FromRadio_config_complete_id_tag: {
+                    view->configCompleted();
+                    requestAdditionalConfig();
+                    view->notifyResync(false);
+                    break;
+                }
+                case meshtastic_FromRadio_queueStatus_tag: {
+                    const meshtastic_QueueStatus &q = from.queueStatus;
+                    if (q.free == 0) {
+                        ILOG_CRIT("meshqueue full!?");
+                    }
+                    break;
+                }
+                case meshtastic_FromRadio_rebooted_tag: {
+                    view->notifyResync(true);
+                    setConfigRequested(true);
+                    break;
+                }
+                default: {
+                    ILOG_ERROR("unhandled fromRadio packet variant: %u", from.which_payload_variant);
+                    return false;
+                }
+            }
         }
-        break;
-    }
-    case meshtastic_FromRadio_node_info_tag: {
-        const meshtastic_NodeInfo &node = from.node_info;
-        if (node.has_user) {
-            view->addOrUpdateNode(node.num, node.channel, node.user.short_name, node.user.long_name, node.last_heard,
-                                  (MeshtasticView::eRole)node.user.role, node.user.public_key.size != 0, node.via_mqtt);
-        } else {
-            view->addOrUpdateNode(node.num, node.channel, node.last_heard, (MeshtasticView::eRole)node.user.role, false, node.via_mqtt);
-        }
-        if (node.has_position) {
-            view->updatePosition(node.num, node.position.latitude_i, node.position.longitude_i, node.position.altitude, 0,
-                                 node.position.precision_bits);
-        }
-        if (node.has_device_metrics) {
-            view->updateMetrics(node.num, node.device_metrics.battery_level, node.device_metrics.voltage,
-                                node.device_metrics.channel_utilization, node.device_metrics.air_util_tx);
-        }
-        break;
-    }
-    case meshtastic_FromRadio_config_tag: {
-        const meshtastic_Config &config = from.config;
-        switch (config.which_payload_variant) {
-        case meshtastic_Config_device_tag: {
-            const meshtastic_Config_DeviceConfig &cfg = config.payload_variant.device;
-            view->updateDeviceConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_position_tag: {
-            const meshtastic_Config_PositionConfig &cfg = config.payload_variant.position;
-            view->updatePositionConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_power_tag: {
-            const meshtastic_Config_PowerConfig &cfg = config.payload_variant.power;
-            view->updatePowerConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_network_tag: {
-            const meshtastic_Config_NetworkConfig &cfg = config.payload_variant.network;
-            view->updateNetworkConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_display_tag: {
-            const meshtastic_Config_DisplayConfig &cfg = config.payload_variant.display;
-            view->updateDisplayConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_lora_tag: {
-            const meshtastic_Config_LoRaConfig &cfg = config.payload_variant.lora;
-            view->updateLoRaConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_bluetooth_tag: {
-            const meshtastic_Config_BluetoothConfig &cfg = config.payload_variant.bluetooth;
-            view->updateBluetoothConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_security_tag: {
-            const meshtastic_Config_SecurityConfig &cfg = config.payload_variant.security;
-            view->updateSecurityConfig(cfg);
-            break;
-        }
-        case meshtastic_Config_sessionkey_tag: {
-            const meshtastic_Config_SessionkeyConfig &cfg = config.payload_variant.sessionkey;
-            view->updateSessionKeyConfig(cfg);
-            break;
-        }
-        default:
-            ILOG_ERROR("unsupported device config variant: %u\n", config.which_payload_variant);
+        else {
+            ILOG_WARN("skipping packet while setup not finished: %u", from.which_payload_variant);
             return false;
         }
-        break;
-    }
-    case meshtastic_FromRadio_moduleConfig_tag: {
-        const meshtastic_ModuleConfig &module = from.moduleConfig;
-        switch (module.which_payload_variant) {
-        case meshtastic_ModuleConfig_mqtt_tag: {
-            const meshtastic_ModuleConfig_MQTTConfig &cfg = module.payload_variant.mqtt;
-            view->updateMQTTModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_serial_tag: {
-            const meshtastic_ModuleConfig_SerialConfig &cfg = module.payload_variant.serial;
-            view->updateSerialModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_external_notification_tag: {
-            const meshtastic_ModuleConfig_ExternalNotificationConfig &cfg = module.payload_variant.external_notification;
-            view->updateExtNotificationModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_store_forward_tag: {
-            const meshtastic_ModuleConfig_StoreForwardConfig &cfg = module.payload_variant.store_forward;
-            view->updateStoreForwardModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_range_test_tag: {
-            const meshtastic_ModuleConfig_RangeTestConfig &cfg = module.payload_variant.range_test;
-            view->updateRangeTestModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_telemetry_tag: {
-            const meshtastic_ModuleConfig_TelemetryConfig &cfg = module.payload_variant.telemetry;
-            view->updateTelemetryModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_canned_message_tag: {
-            const meshtastic_ModuleConfig_CannedMessageConfig &cfg = module.payload_variant.canned_message;
-            view->updateCannedMessageModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_audio_tag: {
-            const meshtastic_ModuleConfig_AudioConfig &cfg = module.payload_variant.audio;
-            view->updateAudioModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_remote_hardware_tag: {
-            const meshtastic_ModuleConfig_RemoteHardwareConfig &cfg = module.payload_variant.remote_hardware;
-            view->updateRemoteHardwareModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_neighbor_info_tag: {
-            const meshtastic_ModuleConfig_NeighborInfoConfig &cfg = module.payload_variant.neighbor_info;
-            view->updateNeighborInfoModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_ambient_lighting_tag: {
-            const meshtastic_ModuleConfig_AmbientLightingConfig &cfg = module.payload_variant.ambient_lighting;
-            view->updateAmbientLightingModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_detection_sensor_tag: {
-            const meshtastic_ModuleConfig_DetectionSensorConfig &cfg = module.payload_variant.detection_sensor;
-            view->updateDetectionSensorModule(cfg);
-            break;
-        }
-        case meshtastic_ModuleConfig_paxcounter_tag: {
-            const meshtastic_ModuleConfig_PaxcounterConfig &cfg = module.payload_variant.paxcounter;
-            view->updatePaxCounterModule(cfg);
-            break;
-        }
-        default:
-            ILOG_ERROR("unsupported module config variant: %u\n", module.which_payload_variant);
-            return false;
-        }
-        break;
-    }
-    case meshtastic_FromRadio_fileInfo_tag: {
-        const meshtastic_FileInfo &fileinfo = from.fileInfo;
-        view->updateFileinfo(fileinfo);
-        break;
-    }
-    case meshtastic_FromRadio_channel_tag: {
-        const meshtastic_Channel &ch = from.channel;
-        if (ch.has_settings) {
-            view->updateChannelConfig(ch);
-        }
-        break;
-    }
-    case meshtastic_FromRadio_metadata_tag: {
-        const meshtastic_DeviceMetadata &meta = from.metadata;
-        view->setDeviceMetaData(meta.hw_model, meta.firmware_version, meta.hasBluetooth, meta.hasWifi, meta.hasEthernet,
-                                meta.canShutdown);
-        break;
-    }
-    case meshtastic_FromRadio_config_complete_id_tag: {
-        view->configCompleted();
-        requestAdditionalConfig();
-        view->notifyResync(false);
-        break;
-    }
-    case meshtastic_FromRadio_queueStatus_tag: {
-        const meshtastic_QueueStatus &q = from.queueStatus;
-        if (q.free == 0) {
-            ILOG_CRIT("meshqueue full!?\n");
-        }
-        break;
-    }
-    case meshtastic_FromRadio_rebooted_tag: {
-        view->notifyResync(true);
-        setConfigRequested(true);
-        break;
-    }
-    default: {
-        ILOG_ERROR("unhandled fromRadio packet variant: %u\n", from.which_payload_variant);
-        return false;
-    }
     }
     return true;
 }
 
 bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
 {
-    ILOG_DEBUG("received packet from 0x%08x(%u), portnum=%u\n", p.from, p.from, p.decoded.portnum);
+    ILOG_DEBUG("received packet from 0x%08x, id=0x%08x, portnum=%u", p.from, p.id, p.decoded.portnum);
     view->packetReceived(p);
 
     // only for direct neighbors print rssi/snr
@@ -769,7 +801,7 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
 
     switch (p.decoded.portnum) {
     case meshtastic_PortNum_TEXT_MESSAGE_APP: {
-        ILOG_INFO("received text message from 0x%08x(%u): '%s'\n", p.from, p.from, (const char *)p.decoded.payload.bytes);
+        ILOG_INFO("received text message '%s'", (const char *)p.decoded.payload.bytes);
         view->newMessage(p.from, p.to, p.channel, (const char *)p.decoded.payload.bytes);
         break;
     }
@@ -785,7 +817,7 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
             }
             view->updateTime(position.time);
         } else {
-            ILOG_ERROR("Error decoding protobuf meshtastic_Position!\n");
+            ILOG_ERROR("Error decoding protobuf meshtastic_Position!");
             return false;
         }
         break;
@@ -796,7 +828,7 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
             view->updateNode(p.from, -1, user.short_name, user.long_name, 0, (MeshtasticView::eRole)user.role,
                              user.public_key.size != 0, false); // TODO viaMqtt?
         } else {
-            ILOG_ERROR("Error decoding protobuf meshtastic_User (nodeinfo)!\n");
+            ILOG_ERROR("Error decoding protobuf meshtastic_User (nodeinfo)!");
             return false;
         }
         break;
@@ -818,38 +850,39 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
             case meshtastic_Telemetry_air_quality_metrics_tag: {
                 view->updateAirQualityMetrics(p.from, telemetry.variant.air_quality_metrics);
                 return false;
-                break;
             }
             case meshtastic_Telemetry_power_metrics_tag: {
                 view->updatePowerMetrics(p.from, telemetry.variant.power_metrics);
                 return false;
-                break;
+            }
+            case meshtastic_Telemetry_local_stats_tag: {
+                ILOG_DEBUG("meshtastic_Telemetry_local_stats_tag not implemented!");
+                return false;
             }
             default:
-                ILOG_ERROR("unhandled telemetry variant: %u\n", telemetry.which_variant);
+                ILOG_ERROR("unhandled telemetry variant: %u", telemetry.which_variant);
                 return false;
-                break;
             }
         } else {
-            ILOG_ERROR("Error decoding protobuf meshtastic_Telemetry!\n");
+            ILOG_ERROR("Error decoding protobuf meshtastic_Telemetry!");
             return false;
         }
         break;
     }
     case meshtastic_PortNum_TRACEROUTE_APP: {
-        ILOG_DEBUG("PortNum_TRACEROUTE_APP\n");
+        ILOG_DEBUG("PortNum_TRACEROUTE_APP");
         meshtastic_RouteDiscovery route;
         if (pb_decode_from_bytes(p.decoded.payload.bytes, p.decoded.payload.size, &meshtastic_RouteDiscovery_msg, &route)) {
             view->handleResponse(p.from, p.decoded.request_id, route);
         } else {
-            ILOG_ERROR("Error decoding protobuf meshtastic_RouteDiscovery!\n");
+            ILOG_ERROR("Error decoding protobuf meshtastic_RouteDiscovery!");
             return false;
         }
         break;
     }
     case meshtastic_PortNum_ROUTING_APP: {
         meshtastic_Routing routing;
-        ILOG_DEBUG("PortNum_ROUTING_APP: id:%08x, from:%08x, to:%08x, dest:%08x, source:%08x, requestId:%08x, replyId:%08x\n",
+        ILOG_DEBUG("PortNum_ROUTING_APP: id:%08x, from:%08x, to:%08x, dest:%08x, source:%08x, requestId:%08x, replyId:%08x",
                    p.id, p.from, p.to, p.decoded.dest, p.decoded.source, p.decoded.request_id, p.decoded.reply_id);
         if (pb_decode_from_bytes(p.decoded.payload.bytes, p.decoded.payload.size, &meshtastic_Routing_msg, &routing)) {
             if (routing.which_variant == meshtastic_Routing_error_reason_tag) {
@@ -859,20 +892,20 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
                     view->handleResponse(p.from, p.decoded.request_id, routing, p);
                     break;
                 case meshtastic_Routing_Error_NO_RESPONSE:
-                    ILOG_DEBUG("Routing error: no response\n");
+                    ILOG_DEBUG("Routing error: no response");
                     // this response is sent by the other node when position is not availble
                     // however, it contains valid rssi/snr, so use these
                     view->handlePositionResponse(p.from, p.decoded.request_id, p.rx_rssi, p.rx_snr, p.hop_limit == p.hop_start);
                     break;
                 default:
-                    ILOG_WARN("got unhandled Routing_Error: %d\n", routing.error_reason);
+                    ILOG_WARN("got unhandled Routing_Error: %d", routing.error_reason);
                     break;
                 }
             } else {
                 view->handleResponse(p.from, p.decoded.request_id, routing, p);
             }
         } else {
-            ILOG_ERROR("Error decoding protobuf meshtastic_Routing!\n");
+            ILOG_ERROR("Error decoding protobuf meshtastic_Routing!");
             return false;
         }
         break;
@@ -925,7 +958,7 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
                     break;
                 }
                 default:
-                    ILOG_ERROR("unhandled meshtastic_Config variant: %u\n", config.which_payload_variant);
+                    ILOG_ERROR("unhandled meshtastic_Config variant: %u", config.which_payload_variant);
                     return false;
                 }
                 break;
@@ -939,7 +972,7 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
                     break;
                 }
                 default:
-                    ILOG_ERROR("unhandled meshtastic_ModuleConfig variant: %u\n", config.which_payload_variant);
+                    ILOG_ERROR("unhandled meshtastic_ModuleConfig variant: %u", config.which_payload_variant);
                     return false;
                 }
                 break;
@@ -950,15 +983,15 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
             }
             case meshtastic_AdminMessage_set_channel_tag: {
                 // TODO
-                ILOG_WARN("meshtastic_AdminMessage_set_channel_tag not implemented\n");
+                ILOG_WARN("meshtastic_AdminMessage_set_channel_tag not implemented");
                 return false;
             }
             default:
-                ILOG_ERROR("unhandled AdminMessage variant: %u\n", admin.which_payload_variant);
+                ILOG_ERROR("unhandled AdminMessage variant: %u", admin.which_payload_variant);
                 return false;
             }
         } else {
-            ILOG_ERROR("Error decoding protobuf meshtastic_AdminMessage!\n");
+            ILOG_ERROR("Error decoding protobuf meshtastic_AdminMessage!");
             return false;
         }
         break;
@@ -966,7 +999,7 @@ bool ViewController::packetReceived(const meshtastic_MeshPacket &p)
     case meshtastic_PortNum_SIMULATOR_APP:
         break;
     default:
-        ILOG_ERROR("unhandled meshpacket portnum: %u\n", p.decoded.portnum);
+        ILOG_ERROR("unhandled meshpacket portnum: %u", p.decoded.portnum);
         return false;
     }
     return true;
