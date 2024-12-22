@@ -1030,7 +1030,7 @@ void create_screen_main_screen() {
                     objects.message_input_area = obj;
                     lv_obj_set_pos(obj, 6, -1);
                     lv_obj_set_size(obj, LV_PCT(85), 25);
-                    lv_textarea_set_max_length(obj, 237);
+                    lv_textarea_set_max_length(obj, 233);
                     lv_textarea_set_placeholder_text(obj, "Enter Text ...");
                     lv_textarea_set_one_line(obj, true);
                     lv_textarea_set_password_mode(obj, false);
@@ -4201,7 +4201,8 @@ void create_screen_main_screen() {
                                             objects.nodes_filter_name_area = obj;
                                             lv_obj_set_pos(obj, -40, -2);
                                             lv_obj_set_size(obj, LV_PCT(60), 24);
-                                            lv_textarea_set_max_length(obj, 15);
+                                            lv_textarea_set_max_length(obj, 233);
+
                                             lv_textarea_set_placeholder_text(obj, "!Enter Filter ...");
                                             lv_textarea_set_one_line(obj, true);
                                             lv_textarea_set_password_mode(obj, false);
@@ -4393,7 +4394,8 @@ void create_screen_main_screen() {
                                             objects.nodes_hl_name_area = obj;
                                             lv_obj_set_pos(obj, -40, -2);
                                             lv_obj_set_size(obj, LV_PCT(60), 24);
-                                            lv_textarea_set_max_length(obj, 15);
+                                            lv_textarea_set_max_length(obj, 233);
+
                                             lv_textarea_set_placeholder_text(obj, "Enter Filter ...");
                                             lv_textarea_set_one_line(obj, true);
                                             lv_textarea_set_password_mode(obj, false);

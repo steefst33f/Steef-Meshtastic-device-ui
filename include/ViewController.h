@@ -79,7 +79,7 @@ class ViewController
     virtual bool send(uint32_t to, meshtastic_PortNum portnum, const meshtastic_Data_payload_t &payload, bool wantRsp = false);
     // generic send method to send a decoded byte string in a meshpacket to radio
     virtual bool send(uint32_t to, uint8_t ch, uint8_t hopLimit, uint32_t requestId, meshtastic_PortNum portnum, bool wantRsp,
-                      const unsigned char bytes[237], size_t len);
+                      const unsigned char bytes[233], size_t len);
     virtual bool receive(void);
     // request initial config from radio
     virtual void requestConfig(void);
