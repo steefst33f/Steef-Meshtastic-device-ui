@@ -47,10 +47,10 @@ DeviceGUI::DeviceGUI(const DisplayDriverConfig *cfg, DisplayDriver *driver) : di
 
 void DeviceGUI::init(IClientBase *client)
 {
-    ILOG_DEBUG("Display driver init...\n");
+    ILOG_DEBUG("Display driver init...");
     displaydriver->init(this);
 
-    ILOG_DEBUG("Input driver init...\n");
+    ILOG_DEBUG("Input driver init...");
 #if LV_USE_LIBINPUT
     if (linuxInputDriver)
         linuxInputDriver->init();
@@ -70,8 +70,9 @@ void DeviceGUI::init(IClientBase *client)
     if (inputdriver)
         inputdriver->init();
 
-    ILOG_DEBUG("ui_init...\n");
-    ui_init();
+    // we need to call this from the view
+    //ILOG_DEBUG("ui_init...");
+    //ui_init();
 }
 
 void DeviceGUI::task_handler(void)

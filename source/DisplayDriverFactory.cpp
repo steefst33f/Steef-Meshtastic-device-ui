@@ -24,6 +24,9 @@
 #ifdef SENSECAP_INDICATOR
 #include "LGFX_INDICATOR.h"
 #endif
+#ifdef ESP_4848S040
+#include "LGFX_4848S040.h"
+#endif
 #ifdef T_DECK
 #include "LGFX_T_DECK.h"
 #endif
@@ -68,7 +71,7 @@ DisplayDriver *DisplayDriverFactory::create(uint16_t width, uint16_t height)
 #elif defined(LGFX_DRIVER)
     return new LGFXDriver<LGFX_DRIVER>(width, height);
 #endif
-    ILOG_CRIT("DisplayDriverFactory: missing or wrong configuration\n");
+    ILOG_CRIT("DisplayDriverFactory: missing or wrong configuration");
     assert(false);
     return nullptr;
 }
@@ -113,6 +116,10 @@ DisplayDriver *DisplayDriverFactory::create(const DisplayDriverConfig &cfg)
     case DisplayDriverConfig::device_t::INDICATOR:
         return new LGFXDriver<LGFX_INDICATOR>(cfg.width(), cfg.height());
         break;
+#elif defined(ESP_4848S040)
+    case DisplayDriverConfig::device_t::ESP4848S040:
+        return new LGFXDriver<LGFX_4848S040>(cfg.width(), cfg.height());
+        break;
 #elif defined(PICOMPUTER_S3)
     case DisplayDriverConfig::device_t::BPICOMPUTER_S3:
         return new LGFXDriver<LGFX_PICOMPUTER_S3>(cfg.width(), cfg.height());
@@ -148,7 +155,7 @@ DisplayDriver *DisplayDriverFactory::create(const DisplayDriverConfig &cfg)
         break;
 #endif
     default:
-        ILOG_CRIT("LGFX device_t config not implemented: %d\n", cfg._device);
+        ILOG_CRIT("LGFX device_t config not implemented: %d", cfg._device);
         assert(false);
         break;
     }
